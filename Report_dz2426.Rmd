@@ -1,0 +1,124 @@
+---
+title: "Data Science I TA Audition"
+author: "Duzhi Zhao"
+date: "7/2/2020"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(viridis)
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 8, 
+  fig.height = 6,
+  out.width = "80%"
+)
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+```
+
+# Introduction  
+The original spreadsheet "dog_weights.xlsx" comes from a friend of Prof.Jeff Goldsmith. It primarily records dogs' weights on every measurement date for the three dogs: Raisin, Simone, and Gagne. The recording period spans from 2018-08-12 to 2020-06-13. **Our goal** is to see the trend of each dog's weight and their RER over time.
+
+# Data manipulation
+After importing and tidying the original spreadsheet, the working dataset "dog_data" now contains 181 observations and 7 variables. On every measurement date (`date`), the dataset contains weight measurements in pounds for each dog (`weight_raisin_lbs`, `weight_simone_lbs`, `weight_gagne_lbs`), and resting energy requirements (RER) in calories for each dog (`rer_raisin`, `rer_simone`, `rer_gagne`) (Appendix Table 1). RER was calculated by multiplying the each dog's body weight in kilograms raised to the ¾ power by 70 [1]. Therefore, we could forsee that the trend of dog weights and RER would be the same.  
+A descriptive statistics table (Appendix Table 2) and a panel of three boxplots (Appendix Figure 1) were created to show the distribution of each dog's weight. Both suggested that there were several outlier measurements for each dog. All weight measurements were decided to be kept since the way of data collection was longitudinal and some large deviations in dog weights may require further investigation.
+
+# Results  
+The line plot (Appendix Figure 2) showed that all three dogs had a decreasing trend in dog weights from the beginning to early January 2019. In particular, Raisin was affected the most at this period. After January 2019, Raisin and Simone reached a steady plateau with small deviations in weights. Gagne, however, continued to lose weight until the time of death. A significant drop-off in Raisin's weight was spotted on the graph, and after re-checking the dataset, this was largely due to a measurement error in weight.  
+Resting energy requirements for each dog (Appendix Figure 3), as discussed earlier, showed the same trend as the line plot for weights.
+
+# Discussion  
+The early decreasing trend in all three dogs' weights may result from a change in their living environment. Notes from the original spreadsheet indicated their living at Webers's places from time to time at this period. A continuous change in living places may affect their appeptite and sense of security. There could also be something affecting their health status at Webers's place, such as rivlary with other dogs on food, harmful living conditions, etc. 
+Before Gagne's death, we saw that its weight had been decreasing for months. This could be a lesson for us to learn that we should pay attention to the dog's weight over time since this may indicate how healthy it is.
+
+# Reference  
+[1] Basic Calorie Calculator. (n.d.). Retrieved from https://vet.osu.edu/vmc/companion/our-services/nutrition-support-service/basic-calorie-calculator
+
+# Appendix
+```{r}
+# Import and tidy dataset
+dog_import = readxl::read_excel("./data/dog_weights.xlsx") 
+
+dog_data = readxl::read_excel("./data/dog_weights.xlsx", skip = 2) %>% 
+  janitor::clean_names() %>% 
+  mutate(
+    date = janitor::excel_numeric_to_date(as.numeric(date)),
+    weight_raisin_lbs = as.numeric(substr(raisin, 1, 2)) + as.numeric(substr(raisin, 3, 5))*0.0625,
+    weight_simone_lbs = as.numeric(substr(simone, 1, 2)) + as.numeric(substr(simone, 3, 5))*0.0625,
+    weight_gagne_lbs = as.numeric(substr(gagne, 1, 2)) + as.numeric(substr(gagne, 3, 5))*0.0625,
+    rer_raisin = ((weight_raisin_lbs*0.453592)^0.75)*70,
+    rer_simone = ((weight_simone_lbs*0.453592)^0.75)*70,
+    rer_gagne = ((weight_gagne_lbs*0.453592)^0.75)*70
+  ) %>% 
+  # Transfer all units into pounds
+  # RER stands for Resting Energy Requirement (18 lb dog = 339 cal)
+  # https://vet.osu.edu/vmc/companion/our-services/nutrition-support-service/basic-calorie-calculator
+  select(date, 7:12) %>%  # Select columns of interest 
+  drop_na(date) # Remove one observation without date information
+```
+
+```{r}
+# First 5 rows
+head(dog_data, 5) %>% 
+  knitr::kable(format = "latex", caption = "First 5 rows of dataset") %>% 
+  kableExtra::kable_styling(latex_options = c("scale_down","hold_position"))
+```
+
+```{r}
+# Descriptive statistics table
+summary(dog_data) %>% 
+  knitr::kable(format = "latex", caption = "Descriptive Statistics") %>% 
+  kableExtra::kable_styling(latex_options = c("scale_down", "hold_position"))
+```
+
+```{r}
+# Figure 1. Boxplots for each dog's weight
+dog_data %>% 
+  ggplot() +
+  geom_boxplot(aes(x = "Raisin", y = weight_raisin_lbs), colour = "darkred") + 
+  geom_boxplot(aes(x = "Simone", y = weight_simone_lbs), colour = "steelblue") + 
+  geom_boxplot(aes(x = "Gagne", y = weight_gagne_lbs), colour = "darkgreen") + 
+  labs(x = "Dogs", y = "Weight (lbs)",
+       title = "Figure 1. Distribution of each dog's weight")
+```
+
+```{r}
+# Figure 2. Dog weight by time
+dog_data %>% 
+  ggplot(aes(x = date)) + 
+  geom_line(aes(y = weight_raisin_lbs, colour = "Raisin")) + 
+  geom_line(aes(y = weight_simone_lbs, colour = "Simone")) + 
+  geom_line(aes(y = weight_gagne_lbs, colour = "Gagne")) + 
+  labs(x = "Date", y = "Weight (lbs)", 
+       title = "Figure 2. Dog weight measured from 2018-08-12 to 2020-06-13") + 
+  scale_colour_manual("Dog", 
+                      values = c("Raisin" = "darkred", "Simone" = "steelblue", "Gagne" = "darkgreen")) +
+  scale_x_date(date_breaks = "3 month")
+```
+
+```{r}
+# Figure 3. RER by time
+dog_data %>% 
+  ggplot(aes(x = date)) + 
+  geom_line(aes(y = rer_raisin, colour = "Raisin")) + 
+  geom_line(aes(y = rer_simone, colour = "Simone")) + 
+  geom_line(aes(y = rer_gagne, colour = "Gagne")) + 
+  labs(x = "Date", y = "Resting energy requirement (calories)", 
+       title = "Figure 3. Resting Energy Requirement measured from 2018-08-12 to 2020-06-13") + 
+  scale_colour_manual("Dog", 
+                      values = c("Raisin" = "darkred", "Simone" = "steelblue", "Gagne" = "darkgreen")) +
+  scale_x_date(date_breaks = "3 month")
+```
+
